@@ -1,0 +1,18 @@
+[package]
+name = "reliability-tester"
+version = "0.1.0"
+authors = ["dop3ch3f"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+env_logger = "0.6"
+failure = "0.1"
+log = "0.4"
+reqwest = { version = "0.10", features = ["blocking","json"] }
+tokio = { version = "0.2", features = ["full"] }
+clap = "2.33.0"
+crossbeam = "0.7.3"
+crossbeam-utils = "0.7"
+static_assertions = "1.1.0"
