@@ -4,12 +4,15 @@ extern crate crossbeam;
 extern crate crossbeam_utils;
 extern crate reqwest;
 
+use crossbeam_utils::sync::WaitGroup;
 use reqwest::{
     blocking::{get, Response},
     StatusCode,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 // struct for application configuration
 pub struct AppConfig<I> {
@@ -25,10 +28,10 @@ pub struct InputConfig<I> {
 
 // struct for processing configurations and settings namely:  hits e.t.c
 pub struct ProcessConfig {
-    hits: u8,
+    hits: i32,
 }
 
-// struct for output configurations and settings namely: file,console,loggine enabled e.t.c
+// struct for output configurations and settings namely: file,console,logging enabled e.t.c
 pub struct OutputConfig {
     console: bool,
     logging: bool,
@@ -39,80 +42,151 @@ pub struct HttpProtocol {
     method: String,
     url: String,
     headers: HashMap<String, String>,
+    timeout: Duration,
 }
 
 impl HttpProtocol {
-    pub fn new(method: &str, url: &str, headers: HashMap<String, String>) -> HttpProtocol {
+    pub fn new(
+        method: &str,
+        url: &str,
+        headers: HashMap<String, String>,
+        timeout: Duration,
+    ) -> HttpProtocol {
         HttpProtocol {
             method: String::from(method),
             url: String::from(url),
-            headers: headers,
+            headers,
+            timeout,
         }
     }
 }
 
 // engine for running tests on http protocol
 fn http_engine(
-    hits: u8,
-    method: &str,
-    url: &str,
-) -> Result<HashMap<&'static str, f32>, Box<dyn std::error::Error>> {
-    let success_count = Arc::new(Mutex::new(0.0));
-    let failed_count = Arc::new(Mutex::new(0.0));
-    let percentage_uptime = Arc::new(Mutex::new(0.0));
-    let loop_value = hits;
+    config_arc: &Arc<AppConfig<HttpProtocol>>,
+) -> Result<HashMap<&'static str, i32>, Box<dyn std::error::Error>> {
+    let success_count = Arc::new(Mutex::new(0));
+    let failed_count = Arc::new(Mutex::new(0));
+    let config_arc = config_arc.clone();
+    let loop_value = config_arc.process_config.hits;
 
-    crossbeam::scope(|s| {
-        for _ in 0..loop_value {
-            let success_pointer = Arc::clone(&success_count);
-            let failed_pointer = Arc::clone(&failed_count);
-            let percentage_pointer = Arc::clone(&percentage_uptime);
+    let wg = WaitGroup::new();
 
-            s.spawn(move |_| {
-                // request generate match
-                let resp: reqwest::Result<Response> = match method {
-                    "get" => get(url),
-                    _ => get(url),
-                };
-                let mut success = success_pointer.lock().unwrap();
-                let mut failed = failed_pointer.lock().unwrap();
-                let mut percentage = percentage_pointer.lock().unwrap();
-                // if no errors
-                if resp.is_ok() {
-                    let resp_value = resp.unwrap();
-                    // if status code is successful
-                    if resp_value.status() == StatusCode::OK {
-                        *success += 1.0;
-                    } else {
-                        *failed += 1.0;
-                    }
+    for i in 0..loop_value {
+        // create another reference to the wait group
+        let wg = wg.clone();
+        let success_pointer = Arc::clone(&success_count);
+        let failed_pointer = Arc::clone(&failed_count);
+        let config = config_arc.clone();
+
+        thread::spawn(move || {
+            println!("spawning thread = {:?}", i);
+            let new_config = &config.clone();
+            let timeout = new_config.input_config.protocol.timeout;
+            let method = &new_config.input_config.protocol.method;
+            let url = &new_config.input_config.protocol.url;
+            let client = reqwest::blocking::Client::builder()
+                .timeout(timeout)
+                .build()
+                .unwrap();
+            // request generate match
+            let resp: Result<reqwest::blocking::Response, reqwest::Error> = match method.as_str() {
+                "get" => client.get(url.as_str()).send(),
+                _ => client.get(url.as_str()).send(),
+            };
+            let mut success = success_pointer.lock().unwrap();
+            let mut failed = failed_pointer.lock().unwrap();
+            if resp.is_ok() {
+                let response = resp.unwrap();
+                // if status code is successful
+                if response.status().is_success() {
+                    println!("success = {:?}", response);
+                    *success += 1;
                 } else {
-                    *failed += 1.0;
+                    println!("error = {:?}", response);
+                    // println!("json = {:?}", resp.json<>)
+                    *failed += 1;
                 }
-                *percentage = (*success / (*success + *failed)) * 100.0;
-            });
-        }
-    })
-    .unwrap();
+            } else {
+                let response = resp.unwrap_err();
+                println!("status = {:?}", response);
+                // println!("json = {:?}", resp.json<>)
+                *failed += 1;
+            }
+            drop(wg);
+        });
+    }
+
+    // Block Until all threads have finished their work
+    wg.wait();
+
+    // crossbeam::scope(|s| {
+    //     for i in 0..loop_value {
+    //         let success_pointer = Arc::clone(&success_count);
+    //         let failed_pointer = Arc::clone(&failed_count);
+    //
+    //         s.spawn(move |_| {
+    //             println!("spawning thread = {:?}", i);
+    //             let client = reqwest::blocking::Client::builder()
+    //                 .timeout(timeout)
+    //                 .build()
+    //                 .unwrap();
+    //             // request generate match
+    //             let resp: Result<reqwest::blocking::Response, reqwest::Error> = match method {
+    //                 "get" => client.get(url).send(),
+    //                 _ => client.get(url).send(),
+    //             };
+    //             let mut success = success_pointer.lock().unwrap();
+    //             let mut failed = failed_pointer.lock().unwrap();
+    //             if resp.is_ok() {
+    //                 let response = resp.unwrap();
+    //                 // if status code is successful
+    //                 if response.status().is_success() {
+    //                     *success += 1.0;
+    //                 } else {
+    //                     println!("status = {:?}", response);
+    //                     // println!("json = {:?}", resp.json<>)
+    //                     *failed += 1.0;
+    //                 }
+    //             } else {
+    //                 let response = resp.unwrap_err();
+    //                 println!("status = {:?}", response);
+    //                 // println!("json = {:?}", resp.json<>)
+    //                 *failed += 1.0;
+    //             }
+    //         });
+    //     }
+    // })
+    // .unwrap();
+
+    let success = *success_count.lock().unwrap() as f32;
+    let failed = *failed_count.lock().unwrap() as f32;
+    let percentage_uptime: f32 = (success / (success + failed)) * 100.0;
+
     // prepare results
     let mut results = HashMap::new();
-    results.insert("Successful Requests: ", *success_count.lock().unwrap());
-    results.insert("Failed Requests: ", *failed_count.lock().unwrap());
-    results.insert("Percentage Uptime: ", *percentage_uptime.lock().unwrap());
-    results.insert("Total Requests: ", hits as f32);
-    Ok(results)
+    results.insert("Successful Requests:", *success_count.lock().unwrap());
+    results.insert("Failed Requests:", *failed_count.lock().unwrap());
+    results.insert("Percentage Successful:", percentage_uptime as i32);
+    results.insert("Total Requests:", config_arc.process_config.hits);
+    return Ok(results);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // generate test http config
-    let http_config: HttpProtocol =
-        HttpProtocol::new("get", "https://httpbin.org/ip", HashMap::new());
+    let http_config: HttpProtocol = HttpProtocol::new(
+        "get",
+        "http://127.0.0.1:8000/api/public/lessons",
+        // "https://www.google.com",
+        HashMap::new(),
+        Duration::from_secs(120),
+    );
     // generate input config
     let input_config: InputConfig<HttpProtocol> = InputConfig {
         protocol: http_config,
     };
     // generate process config
-    let process_config: ProcessConfig = ProcessConfig { hits: 8 };
+    let process_config: ProcessConfig = ProcessConfig { hits: 5000 };
     // generate output config
     let output_config: OutputConfig = OutputConfig {
         logging: true,
@@ -120,16 +194,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     // generate operation config
     let config: AppConfig<HttpProtocol> = AppConfig {
-        input_config: input_config,
-        process_config: process_config,
-        output_config: output_config,
+        input_config,
+        process_config,
+        output_config,
     };
 
-    let results = http_engine(
-        config.process_config.hits,
-        config.input_config.protocol.method.as_str(),
-        config.input_config.protocol.url.as_str(),
-    )?;
+    let config_arc = Arc::new(config);
+    let results = http_engine(&config_arc).expect("error occurred here");
     println!("final output: {:?}", results);
     Ok(())
 }
