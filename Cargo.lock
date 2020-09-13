@@ -851,7 +851,9 @@ dependencies = [
  "failure",
  "log",
  "reqwest",
+ "serde_json",
  "static_assertions",
+ "termcolor",
  "tokio",
 ]
 

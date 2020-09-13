@@ -5,19 +5,26 @@ mod engines;
 mod inputs;
 mod outputs;
 mod protocols;
+mod util;
 
-use configs::{AppConfig, InputConfig, OutputConfig, ProcessConfig};
-use engines::http::http_engine;
+use configs::{AppConfig, InputConfig, OutputConfig, ProcessConfig, HttpMethods};
+// use engines::http::http_engine;
+use inputs::console::process_console_inputs;
 use protocols::http::HttpProtocol;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use crate::engines::http::HttpEngine;
+use crate::util::write_to_terminal_multicolor;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    write_to_terminal_multicolor("Welcome to The Reliability Tester");
+    // process all possible inputs
+    // process_console_inputs();
     // generate test http config
     let http_config: HttpProtocol = HttpProtocol::new(
-        "get",
-        "https://www.google.com",
+        HttpMethods::GET,
+        "https://staging.getmedialit.com",
         HashMap::new(),
         Duration::from_secs(120),
     );
@@ -28,7 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // generate process config
     let process_config: ProcessConfig = ProcessConfig {
         hits: 500,
-        is_stress_test: true,
+        is_load_test: true,
+        is_stress_test: false,
         duration: Duration::from_secs(120),
     };
     // generate output config
@@ -44,8 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         output_config,
     };
 
-    let config_arc = Arc::new(config);
-    let results = http_engine(&config_arc).expect("error occurred here");
-    println!("final output: {:?}", results);
+    // trigger the http engine
+    HttpEngine::load_test(config);
+
     Ok(())
 }
