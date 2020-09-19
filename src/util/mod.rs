@@ -1,10 +1,10 @@
 use std::io::{self, Write};
-use termcolor::{BufferWriter, ColorChoice, WriteColor, Color, ColorSpec};
+use termcolor::{BufferWriter, ColorChoice};
 
 pub fn write_to_terminal_multicolor(text: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut buffer_writer = BufferWriter::stderr(ColorChoice::Auto);
+    let buffer_writer = BufferWriter::stderr(ColorChoice::Always);
     let mut buffer = buffer_writer.buffer();
-    writeln!(&mut buffer, "{}", text)?;
-    buffer_writer.print(&buffer)?;
+    writeln!(&mut buffer, "{}", text).expect("an error occurred in terminal writer");
+    buffer_writer.print(&buffer).expect("an error occurred in terminal writer");
     Ok(())
 }

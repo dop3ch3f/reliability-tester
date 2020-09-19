@@ -31,8 +31,6 @@ pub struct OutputConfig {
     pub file: bool,
 }
 
-pub type Callback = fn();
-
 #[derive(Copy, Clone)]
 pub enum HttpMethods {
     GET,
