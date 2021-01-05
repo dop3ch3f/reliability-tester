@@ -1,8 +1,8 @@
 // codes responsible for the handling of http protocol
 
+use crate::configs::HttpMethods;
 use std::collections::HashMap;
 use std::time::Duration;
-use crate::configs::HttpMethods;
 
 // struct for when protocol is Http
 #[derive(Clone)]
@@ -28,4 +28,3 @@ impl HttpProtocol {
         }
     }
 }
-

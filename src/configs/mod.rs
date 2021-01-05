@@ -36,12 +36,10 @@ pub enum HttpMethods {
     GET,
     POST,
     PUT,
-    DELETE
+    DELETE,
 }
 
 pub enum RequestStatus {
     SUCCESS,
-    FAILURE
+    FAILURE,
 }
-
-
