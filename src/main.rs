@@ -19,8 +19,9 @@ use protocols::http::HttpProtocol;
 use std::collections::HashMap;
 use std::io;
 use std::time::Duration;
+use crate::ignition::server::ignite_web_server;
 
-fn ignition() -> Result<(), Box<dyn std::error::Error>> {
+async fn ignition() -> std::io::Result<()> {
     let matches = App::new("Reliability Tester")
         .version("1.0")
         .author("Ifeanyi Ibekie <ifeanyi.ibekie@gmail.com>")
@@ -37,7 +38,9 @@ fn ignition() -> Result<(), Box<dyn std::error::Error>> {
 
     let launch_type = matches.value_of("mode");
     match launch_type {
-        Some("server") => {}
+        Some("server") => {
+            ignite_web_server().await?
+        }
         Some("web") => {}
         Some("file") => {}
         Some("console") => {
@@ -53,10 +56,11 @@ fn ignition() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     write_to_terminal_multicolor("Welcome to The Reliability Tester");
     // kick start the application by running ignition
-    ignition();
+    ignition().await
 
     // // generate test http config
     // let http_config: HttpProtocol = HttpProtocol::new(
@@ -92,5 +96,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // // trigger the http engine
     // HttpEngine::new(config);
 
-    Ok(())
+    //Ok(())
 }

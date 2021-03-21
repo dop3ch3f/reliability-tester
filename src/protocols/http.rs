@@ -3,9 +3,10 @@
 use crate::configs::HttpMethods;
 use std::collections::HashMap;
 use std::time::Duration;
+use serde::{Deserialize, Serialize};
 
 // struct for when protocol is Http
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct HttpProtocol {
     pub method: HttpMethods,
     pub url: String,
