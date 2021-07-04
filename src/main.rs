@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::io;
 use std::time::Duration;
 use crate::ignition::server::ignite_web_server;
+use crate::ignition::desktop::ignite_desktop;
 
 async fn ignition() -> std::io::Result<()> {
     let matches = App::new("Reliability Tester")
@@ -31,7 +32,7 @@ async fn ignition() -> std::io::Result<()> {
                 .short("m")
                 .long("mode")
                 .value_name("mode")
-                .help("What version would you like it to run in console, server, web, file")
+                .help("What version would you like it to run in console, server, web, file, desktop")
                 .takes_value(true),
         )
         .get_matches();
@@ -43,6 +44,9 @@ async fn ignition() -> std::io::Result<()> {
         }
         Some("web") => {}
         Some("file") => {}
+        Some("desktop") => {
+            ignite_desktop();
+        }
         Some("console") => {
             ignite_console();
         }

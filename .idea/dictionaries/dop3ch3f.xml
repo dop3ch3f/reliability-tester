@@ -6,6 +6,7 @@
       <w>ifeanyi</w>
       <w>reqwest</w>
       <w>serde</w>
+      <w>tauri</w>
     </words>
   </dictionary>
 </component>

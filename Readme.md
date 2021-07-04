@@ -10,10 +10,34 @@
 
 - install and setup rust using rustup @ https://www.rust-lang.org/tools/install
 
-## Run
+## Run Server/Console
 
 - cargo run -- --mode=server/console
 
-## Build
+## Run Desktop
+
+### shell window 1
+
+- cd tauri-fe
+
+- npm i
+
+- npm run serve
+
+### shell window 2
+
+- cargo run -- --mode=desktop
+
+## Build Server/Console
 
 - cargo build
+
+## Build Desktop
+
+- cd tauri-fe
+
+- npm run build
+
+- cd ..
+
+- cargo build -- --mode=desktop
