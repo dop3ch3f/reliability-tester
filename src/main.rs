@@ -32,22 +32,22 @@ async fn ignition() -> std::io::Result<()> {
                 .short("m")
                 .long("mode")
                 .value_name("mode")
-                .help("What version would you like it to run in console, server, web, file, desktop")
+                .help("What flavor would you like to run: (cli, api, web, desktop)")
                 .takes_value(true),
         )
         .get_matches();
 
     let launch_type = matches.value_of("mode");
     match launch_type {
-        Some("server") => {
+        Some("api") => {
             ignite_web_server().await?
         }
         Some("web") => {}
-        Some("file") => {}
-        Some("desktop") => {
-            ignite_desktop();
+        Some("gui") => {
+            ignite_desktop()
         }
-        Some("console") => {
+        Some("cli") => {
+            // Todo: Add support for file input in cli mode
             ignite_console();
         }
         _ => {
