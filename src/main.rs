@@ -8,6 +8,7 @@ mod ignition;
 mod outputs;
 mod protocols;
 mod util;
+mod frontend;
 
 use configs::{AppConfig, HttpMethods, InputConfig, OutputConfig, ProcessConfig};
 // use engines::http::http_engine;

@@ -16,28 +16,4 @@
 
 ## Run Desktop
 
-### shell window 1
-
-- cd tauri-fe
-
-- npm i
-
-- npm run serve
-
-### shell window 2
-
-- cargo run -- --mode=desktop
-
-## Build Server/Console
-
-- cargo build
-
-## Build Desktop
-
-- cd tauri-fe
-
-- npm run build
-
-- cd ..
-
-- cargo build -- --mode=desktop
+- cargo run -- --mode=gui
