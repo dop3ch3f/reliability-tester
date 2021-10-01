@@ -30,7 +30,7 @@ pub fn build_home(app: &Application) {
     let increase_button = default_button("+", |b| {});
     let decrease_button = default_button("-", |b| {});
 
-    let default_layout = default_layout();
+    let default_layout: gtk::Box = default_layout().object("box").expect("Could not get object `box` from builder.");
 
     window.set_child(Some(&default_layout));
     window.present();
