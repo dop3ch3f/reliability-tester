@@ -15,46 +15,47 @@ use configs::{AppConfig, HttpMethods, InputConfig, OutputConfig, ProcessConfig};
 use crate::engines::http::HttpEngine;
 use crate::ignition::console::ignite_console;
 use crate::util::write_to_terminal_multicolor;
-use clap::{App, Arg, SubCommand};
+use clap::Parser;
 use protocols::http::HttpProtocol;
 use std::collections::HashMap;
 use std::io;
 use std::time::Duration;
 use crate::ignition::server::ignite_web_server;
 use crate::ignition::desktop::ignite_desktop;
+use crate::ignition::web::ignite_web_app;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    mode: String,
+}
 
 async fn ignition() -> std::io::Result<()> {
-    let matches = App::new("Reliability Tester")
-        .version("1.0")
-        .author("Ifeanyi Ibekie <ifeanyi.ibekie@gmail.com>")
-        .about("Test the reliability of your microservices")
-        .arg(
-            Arg::with_name("mode")
-                .short("m")
-                .long("mode")
-                .value_name("mode")
-                .help("What flavor would you like to run: (cli, api, web, desktop)")
-                .takes_value(true),
-        )
-        .get_matches();
 
-    let launch_type = matches.value_of("mode");
-    match launch_type {
-        Some("api") => {
+    let args = Args::parse();
+    write_to_terminal_multicolor(
+        "Reliability Tester\nIfeanyi Ibekie <ifeanyi.ibekie@gmail.com>\nTest the reliability of your services\nWhat flavor would you like to run: (cli, api, web, desktop)\n"
+    ).expect("TODO: panic message");
+
+    match String::from(args.mode).as_str() {
+        "api" => {
             ignite_web_server().await?
         }
-        Some("web") => {}
-        Some("gui") => {
+        "web" => {
+            ignite_web_app()
+        }
+        "gui" => {
             ignite_desktop()
         }
-        Some("cli") => {
+        "cli" => {
             // Todo: Add support for file input in cli mode
-            ignite_console();
+            ignite_console().expect("TODO: panic message");
         }
         _ => {
             write_to_terminal_multicolor(
                 "No mode chosen exiting... (try running --help to view list of available modes)",
-            );
+            ).expect("TODO: panic message");
         }
     }
 
@@ -63,7 +64,7 @@ async fn ignition() -> std::io::Result<()> {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    write_to_terminal_multicolor("Welcome to The Reliability Tester");
+    write_to_terminal_multicolor("Welcome to The Reliability Tester").expect("TODO: panic message");
     // kick start the application by running ignition
     ignition().await
 

@@ -9,7 +9,7 @@ pub fn write_to_terminal_multicolor(text: &str) -> Result<(), Box<dyn std::error
     // Ok(())
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
     stdout.set_color(ColorSpec::new().set_fg(Some(Color::Green)))?;
-    writeln!(&mut stdout, "{}", text);
+    writeln!(&mut stdout, "{}", text).expect("TODO: panic message");
     Ok(())
 }
 

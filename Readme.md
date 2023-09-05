@@ -8,12 +8,13 @@
 
 ## Install
 
-- install and setup rust using rustup @ https://www.rust-lang.org/tools/install
+- install and setup rust using rustup @ <https://www.rust-lang.org/tools/install>
 
 ## Run Server/Console
 
-- cargo run -- --mode=server/console
+- cargo run -- --mode=api/cli/web/desktop
 
 ## Run Desktop
 
+- install gtk4 in environment
 - cargo run -- --mode=gui

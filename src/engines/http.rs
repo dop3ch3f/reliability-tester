@@ -10,45 +10,101 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::configs::{AppConfig, HttpMethods, RequestStatus};
-use crate::protocols::http::HttpProtocol;
+use crate::configs::{AppConfig, HttpMethods, InputConfig, OutputConfig};
+use crate::protocols::http::{HttpProtocol, HttpProtocolMulti};
 use crate::util::write_to_terminal_multicolor;
 use std::collections::hash_map::RandomState;
 use std::time::Instant;
+use actix_web::web::Json;
 use failure::Fail;
+use reqwest::header::{HeaderValue, HeaderName};
+use serde_json::Value;
 
 pub struct HttpEngine {}
 
 impl HttpEngine {
-    pub fn new(config: AppConfig<HttpProtocol>) {
+    pub fn new(config: AppConfig<HttpProtocol>) -> HashMap<String, Value> {
         // process from config and run test
-        if config.process_config.is_load_test.clone() {
+        if config.input_config.protocol.duration.as_secs_f64() <= 0 as f64 {
             HttpEngine::load_test(config.clone())
         } else {
             HttpEngine::stress_test(config.clone())
         }
     }
-    pub fn load_test(config: AppConfig<HttpProtocol>) {
+    pub fn new_multi(config: AppConfig<HttpProtocolMulti>) -> Vec<HashMap<String, Value>> {
+        write_to_terminal_multicolor("multi test initiated!").expect("unable to write to terminal");
+        // spawn threads for multiple instances of HttpEngine calls
+        let result = Arc::new(Mutex::new(Vec::new()));
+        let wg = WaitGroup::new();
+
+        // loop to generate threads and attach to global wait group
+        for i in 0..(config.input_config.protocol.requests.len() - 1) {
+            let wg = wg.clone();
+            let result_pointer = Arc::clone(&result);
+            let config_clone = config.clone();
+
+            thread::spawn(move || {
+                let request_config = (config_clone.input_config.protocol.requests.get(i).unwrap()).clone();
+                let http_config: HttpProtocol = HttpProtocol::new(
+                    match request_config.method.to_string().as_str() {
+                        "get" => HttpMethods::GET,
+                        "post" => HttpMethods::POST,
+                        "put" => HttpMethods::PUT,
+                        "delete" => HttpMethods::DELETE,
+                        _ => HttpMethods::GET,
+                    },
+                    request_config.url.as_str(),
+                    request_config.headers,
+                    request_config.body_json,
+                    request_config.timeout,
+                    request_config.hits,
+                    request_config.duration
+                );
+
+                let output = HttpEngine::new(AppConfig {
+                    input_config: InputConfig {
+                        protocol: http_config,
+                    },
+                    output_config: OutputConfig {
+                        logging: true,
+                        console: true,
+                        file: true,
+                    }
+                });
+
+                let mut result_vector = result_pointer.lock().unwrap();
+                result_vector.push(output);
+                drop(wg)
+            });
+        }
+
+        wg.wait();
+
+        return result.lock().unwrap().to_vec();
+    }
+    pub fn load_test(config: AppConfig<HttpProtocol>) -> HashMap<String, Value> {
         write_to_terminal_multicolor("load test initiated!").expect("unable to write to terminal");
         // spawn threads per hits at once
-        let results_vec = spawn_threads(config.clone(), config.process_config.hits.clone() as u32);
+        let results_vec = spawn_threads(config.clone(), config.input_config.protocol.hits.clone() as u32);
         // parse results
         let results = prepare_result(results_vec);
         write_to_terminal_multicolor("load test complete!").expect("unable to write to terminal");
         // print results
-        print_result(results);
+        print_result(results.clone());
+        return results;
     }
-    pub fn stress_test(config: AppConfig<HttpProtocol>) {
+    pub fn stress_test(config: AppConfig<HttpProtocol>) -> HashMap<String, Value> {
         write_to_terminal_multicolor("stress test initiated!")
             .expect("unable to write to terminal");
         // spawn threads per hits at once with timer
         let results_vec =
-            spawn_threads_with_timeout(config.clone(), config.process_config.hits.clone() as u32);
+            spawn_threads_with_timeout(config.clone(), config.input_config.protocol.hits.clone() as u32);
         // parse results
         let results = prepare_result(results_vec);
         write_to_terminal_multicolor("stress test complete!").expect("unable to write to terminal");
         // print results
-        print_result(results);
+        print_result(results.clone());
+        return results;
     }
 }
 
@@ -56,7 +112,7 @@ impl HttpEngine {
 pub fn spawn_threads(
     config: AppConfig<HttpProtocol>,
     number: u32,
-) -> Vec<HashMap<&'static str, String, RandomState>> {
+) -> Vec<HashMap<String, Value>> {
     // create an arc vector to work safely across threads
     let result = Arc::new(Mutex::new(Vec::new()));
     // create global wait group for operation
@@ -85,9 +141,9 @@ pub fn spawn_threads(
 pub fn spawn_threads_with_timeout(
     config: AppConfig<HttpProtocol>,
     number: u32,
-) -> Vec<HashMap<&'static str, String, RandomState>> {
+) -> Vec<HashMap<String, Value>> {
     // get end duration of stress test loop
-    let mut end_duration = config.process_config.duration.clone();
+    let mut end_duration = config.input_config.protocol.duration.clone();
     // start initial timer
     let start = Instant::now();
     // set end duration in reference to initial timer
@@ -125,8 +181,8 @@ pub fn spawn_threads_with_timeout(
 }
 
 // fn to generate a simple blocking request
-pub fn generate_request(config: HttpProtocol) -> HashMap<&'static str, String> {
-    let mut response_map: HashMap<&str, String> = HashMap::new();
+pub fn generate_request<'a>(config: HttpProtocol) -> HashMap<String, Value> {
+    let mut response_map: HashMap<String, Value> = HashMap::new();
     let client_builder = reqwest::blocking::Client::builder()
         .timeout(config.timeout)
         .build();
@@ -137,37 +193,75 @@ pub fn generate_request(config: HttpProtocol) -> HashMap<&'static str, String> {
             HttpMethods::GET => client.get(config.url.as_str()).send(),
             _ => client.get(config.url.as_str()).send(),
         };
+
+        // include request information
+        response_map.insert("request_url".parse().unwrap(), config.url.parse().unwrap());
+        response_map.insert("request_method".parse().unwrap(), Value::from(config.method.to_string()));
+        response_map.insert("request_data".parse().unwrap(), Value::from(
+            config.body_json.into_iter().map(
+                |x: (String, Value)| {
+                    serde_json::to_string(&[
+                        x.0.as_str(),
+                        " : ",
+                        x.1.as_str().unwrap()
+                    ]).unwrap()
+                }
+            ).collect::<Vec<String>>()
+        ));
+        response_map.insert("request_headers".parse().unwrap(), Value::from(
+            config.headers.into_iter().map(
+                |x: (String, String)| {
+                    serde_json::to_string(&[
+                        x.0.as_str(),
+                        " : ",
+                        x.1.as_str()
+                    ]).unwrap()
+                }
+            ).collect::<Vec<String>>()
+        ));
+
         if resp.is_ok() {
             let response = resp.unwrap();
             // if status code is successful
             if response.status().is_success() {
                 // println!("success = {:?}", response);
-                response_map.insert("status", "success".parse().unwrap());
-                response_map.insert(
-                    "data",
-                    response
-                        .text()
-                        .expect("Unable to convert to string")
-                        .clone(),
-                );
+                response_map.insert("status".parse().unwrap(), "success".parse().unwrap());
+
             } else {
                 // println!("error = {:?}", response);
-                response_map.insert("status", "failure".parse().unwrap());
-                response_map.insert(
-                    "data",
-                    response
-                        .text()
-                        .expect("Unable to convert to string")
-                        .clone(),
-                );
+                response_map.insert("status".parse().unwrap(), "failure".parse().unwrap());
             }
+
+            // response_map.insert(
+            //     "data".parse().unwrap(),
+            //     Value::from(response.json::<String>().unwrap().to_string()),
+            // );
+
+           response_map.insert(
+               "code".parse().unwrap(),
+               Value::from(response.status().to_string()));
+
+            response_map.insert(
+                "headers".parse().unwrap(),
+                Value::from(
+                        response.headers().into_iter().map(
+                           |x: (&HeaderName, &HeaderValue)|  {
+                               serde_json::to_string(&[
+                                   x.0.as_str(),
+                                   " : ",
+                                   x.1.to_str().unwrap(),
+                               ]).unwrap()
+                           }
+                        ).collect::<Vec<String>>()
+                ),
+            );
         } else {
-            response_map.insert("status", "failure".parse().unwrap());
+            response_map.insert("status".parse().unwrap(), "failure".parse().unwrap());
             let response = resp.unwrap_err();
             // println!("status = {:?}", response);
             response_map.insert(
-                "data",
-                response.to_string(),
+                "data".parse().unwrap(),
+                response.to_string().parse().unwrap(),
             );
         }
     }
@@ -177,34 +271,41 @@ pub fn generate_request(config: HttpProtocol) -> HashMap<&'static str, String> {
 
 // fn to parse received vector of hashmap into final result hashmap
 pub fn prepare_result<'a>(
-    result_info: Vec<HashMap<&str, String, RandomState>>,
-) -> HashMap<&'a str, f64> {
+    result_info: Vec<HashMap<String, Value>>,
+) -> HashMap<String, Value> {
     let mut success_count: f64 = 0.0;
     let mut failed_count: f64 = 0.0;
     let mut percentage_successful: f64 = 0.0;
 
     for i in result_info.clone() {
-        if i[&"status"] == String::from("success") {
+        if i["status"] == String::from("success") {
             success_count += 1.0;
         }
 
-        if i[&"status"] == String::from("failure") {
+        if i["status"] == String::from("failure") {
             failed_count += 1.0
         }
 
         percentage_successful = (success_count / (success_count + failed_count)) * 100.0
     }
 
-    let mut results = HashMap::new();
-    results.insert("Successful Requests", success_count);
-    results.insert("Failed Requests", failed_count);
-    results.insert("Percentage Successful", percentage_successful.round());
-    results.insert("Total Requests", result_info.len() as f64);
+    let mut results: HashMap<String, Value> = HashMap::new();
+    results.insert("Successful Requests".parse().unwrap(), Value::from(success_count));
+    results.insert("Failed Requests".parse().unwrap(), Value::from(failed_count));
+    results.insert("Percentage Successful".parse().unwrap(), Value::from(percentage_successful.round()));
+    results.insert("Total Requests".parse().unwrap(), Value::from(result_info.len() as f64));
+    results.insert("requests".parse().unwrap(),
+                   Value::from(result_info.into_iter().map(
+                       |x: HashMap<String, Value>| {
+                           serde_json::to_string(&x).unwrap() as String
+                       }
+                   ).collect::<Vec<String>>())
+    );
     return results;
 }
 
 // fn to print final result hashmap
-pub fn print_result(results: HashMap<&str, f64>) {
+pub fn print_result(results: HashMap<String, Value>) {
     write_to_terminal_multicolor("Results:").expect("unable to write to terminal");
     // print each entry of the result
     for (title, value) in &results {
