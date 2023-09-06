@@ -1,12 +1,12 @@
 use gtk::prelude::*;
-use gtk::{HeaderBar,StackSidebar, Box, Widget, Orientation, WindowControls, PackType, Stack};
+use gtk::{StackSidebar, Box, Orientation, Stack};
 
-pub fn sidebar() -> Box {
+pub fn _sidebar() -> Box {
     let template = Box::builder()
         .orientation(Orientation::Vertical)
         .build();
 
-    let stack = Stack::builder().build();
+    let _stack = Stack::builder().build();
 
     let stack_sidebar = StackSidebar::builder().build();
 

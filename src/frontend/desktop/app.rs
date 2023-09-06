@@ -1,8 +1,8 @@
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow};
-use gtk::gio::{ApplicationFlags};
+use gtk::{Application};
+
 use gtk::glib::{Char, OptionFlags, OptionArg};
-use std::str::FromStr;
+
 use crate::frontend::desktop::screens::home::build_home;
 
 

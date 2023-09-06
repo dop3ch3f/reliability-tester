@@ -1,13 +1,13 @@
 use crate::util::write_to_terminal_multicolor;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use std::io;
-use crate::configs::{AppConfig, GlobalServerState, HttpMethods, InputConfig, OutputConfig};
+
+use crate::configs::{AppConfig, HttpMethods, InputConfig, OutputConfig};
 use crate::protocols::http::{HttpProtocol, HttpProtocolMulti};
-use std::collections::HashMap;
 use std::time::Duration;
-use serde_json::Value;
+use actix_web::web::Data;
+use serde_json::{Map, Value};
 use crate::engines::http::HttpEngine;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 
 
 
@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 pub struct JobRequest {
     method: String,
     url: String,
-    body_json: HashMap<String, Value>,
-    headers: HashMap<String, String>,
+    body_json: Map<String, Value>,
+    headers: Map<String, Value>,
     hits: i32,
     duration: i32,
     timeout: i32,
@@ -86,13 +86,7 @@ async fn execute(req: web::Json<ExecuteRequest>) -> impl Responder {
         },
     });
 
-    HttpResponse::Ok().json(Value::from(
-        response.into_iter().map(
-            |x: HashMap<String, Value>| {
-                serde_json::to_string(&x).unwrap() as String
-            }
-        ).collect::<Vec<String>>()
-    ))
+    HttpResponse::Ok().json(response)
 }
 
 pub async fn ignite_web_server() -> std::io::Result<()> {
@@ -100,9 +94,7 @@ pub async fn ignite_web_server() -> std::io::Result<()> {
     write_to_terminal_multicolor("Server Live @ Port 7373").expect("TODO: panic message");
     HttpServer::new(|| {
         App::new()
-            .data(GlobalServerState {
-                app_name: String::from("Actix-web"),
-            })
+            .app_data(Data::new("Reliability Tester"))
             .service(execute)
             .service(status)
     })

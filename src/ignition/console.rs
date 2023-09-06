@@ -1,13 +1,12 @@
 extern crate clap;
 
-use crate::configs::{AppConfig, HttpMethods, InputConfig, OutputConfig, ProcessConfig};
+use crate::configs::{AppConfig, HttpMethods, InputConfig, OutputConfig};
 use crate::engines::http::HttpEngine;
 use crate::protocols::http::HttpProtocol;
 use crate::util::write_to_terminal_multicolor;
-use clap::Parser;
-use std::collections::HashMap;
 use std::io;
 use std::time::Duration;
+use serde_json::Map;
 
 fn setup_http() -> HttpProtocol {
     let mut method = String::new();
@@ -44,8 +43,8 @@ fn setup_http() -> HttpProtocol {
             _ => HttpMethods::GET,
         },
         url.as_str(),
-        HashMap::new(),
-        HashMap::new(),
+        Map::new(),
+        Map::new(),
         Duration::from_secs(120),
         hits.lines().next().unwrap().parse::<i32>().unwrap(),
         Duration::from_secs(duration.lines().next().unwrap().parse::<u64>().unwrap())

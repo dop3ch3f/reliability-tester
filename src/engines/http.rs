@@ -6,24 +6,23 @@ extern crate reqwest;
 extern crate serde_json;
 
 use crossbeam_utils::sync::WaitGroup;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::configs::{AppConfig, HttpMethods, InputConfig, OutputConfig};
 use crate::protocols::http::{HttpProtocol, HttpProtocolMulti};
 use crate::util::write_to_terminal_multicolor;
-use std::collections::hash_map::RandomState;
+
 use std::time::Instant;
-use actix_web::web::Json;
-use failure::Fail;
+
+
 use reqwest::header::{HeaderValue, HeaderName};
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 pub struct HttpEngine {}
 
 impl HttpEngine {
-    pub fn new(config: AppConfig<HttpProtocol>) -> HashMap<String, Value> {
+    pub fn new(config: AppConfig<HttpProtocol>) -> Map<String, Value> {
         // process from config and run test
         if config.input_config.protocol.duration.as_secs_f64() <= 0 as f64 {
             HttpEngine::load_test(config.clone())
@@ -31,20 +30,20 @@ impl HttpEngine {
             HttpEngine::stress_test(config.clone())
         }
     }
-    pub fn new_multi(config: AppConfig<HttpProtocolMulti>) -> Vec<HashMap<String, Value>> {
-        write_to_terminal_multicolor("multi test initiated!").expect("unable to write to terminal");
+    pub fn new_multi(config: AppConfig<HttpProtocolMulti>) -> Vec<Map<String, Value>> {
+        write_to_terminal_multicolor("Multi test initiated!").expect("unable to write to terminal");
         // spawn threads for multiple instances of HttpEngine calls
         let result = Arc::new(Mutex::new(Vec::new()));
         let wg = WaitGroup::new();
 
         // loop to generate threads and attach to global wait group
-        for i in 0..(config.input_config.protocol.requests.len() - 1) {
+        for i in 0..config.input_config.protocol.requests.len() as i32 {
             let wg = wg.clone();
             let result_pointer = Arc::clone(&result);
             let config_clone = config.clone();
 
             thread::spawn(move || {
-                let request_config = (config_clone.input_config.protocol.requests.get(i).unwrap()).clone();
+                let request_config: HttpProtocol = (config_clone.input_config.protocol.requests.get(i as usize).unwrap()).clone();
                 let http_config: HttpProtocol = HttpProtocol::new(
                     match request_config.method.to_string().as_str() {
                         "get" => HttpMethods::GET,
@@ -82,7 +81,7 @@ impl HttpEngine {
 
         return result.lock().unwrap().to_vec();
     }
-    pub fn load_test(config: AppConfig<HttpProtocol>) -> HashMap<String, Value> {
+    pub fn load_test(config: AppConfig<HttpProtocol>) -> Map<String, Value> {
         write_to_terminal_multicolor("load test initiated!").expect("unable to write to terminal");
         // spawn threads per hits at once
         let results_vec = spawn_threads(config.clone(), config.input_config.protocol.hits.clone() as u32);
@@ -93,7 +92,7 @@ impl HttpEngine {
         print_result(results.clone());
         return results;
     }
-    pub fn stress_test(config: AppConfig<HttpProtocol>) -> HashMap<String, Value> {
+    pub fn stress_test(config: AppConfig<HttpProtocol>) -> Map<String, Value> {
         write_to_terminal_multicolor("stress test initiated!")
             .expect("unable to write to terminal");
         // spawn threads per hits at once with timer
@@ -112,7 +111,7 @@ impl HttpEngine {
 pub fn spawn_threads(
     config: AppConfig<HttpProtocol>,
     number: u32,
-) -> Vec<HashMap<String, Value>> {
+) -> Vec<Map<String, Value>> {
     // create an arc vector to work safely across threads
     let result = Arc::new(Mutex::new(Vec::new()));
     // create global wait group for operation
@@ -141,7 +140,7 @@ pub fn spawn_threads(
 pub fn spawn_threads_with_timeout(
     config: AppConfig<HttpProtocol>,
     number: u32,
-) -> Vec<HashMap<String, Value>> {
+) -> Vec<Map<String, Value>> {
     // get end duration of stress test loop
     let mut end_duration = config.input_config.protocol.duration.clone();
     // start initial timer
@@ -181,8 +180,8 @@ pub fn spawn_threads_with_timeout(
 }
 
 // fn to generate a simple blocking request
-pub fn generate_request<'a>(config: HttpProtocol) -> HashMap<String, Value> {
-    let mut response_map: HashMap<String, Value> = HashMap::new();
+pub fn generate_request<'a>(config: HttpProtocol) -> Map<String, Value> {
+    let mut response_map: Map<String, Value> = Map::new();
     let client_builder = reqwest::blocking::Client::builder()
         .timeout(config.timeout)
         .build();
@@ -191,51 +190,41 @@ pub fn generate_request<'a>(config: HttpProtocol) -> HashMap<String, Value> {
         // request generate match
         let resp: Result<reqwest::blocking::Response, reqwest::Error> = match config.method {
             HttpMethods::GET => client.get(config.url.as_str()).send(),
-            _ => client.get(config.url.as_str()).send(),
+            HttpMethods::POST => client.post(config.url.as_str()).json::<Value>(&Value::from(config.body_json.clone())).send(),
+            HttpMethods::PUT => client.put(config.url.as_str()).json::<Value>(&Value::from(config.body_json.clone())).send(),
+            HttpMethods::DELETE => client.delete(config.url.as_str()).json::<Value>(&Value::from(config.body_json.clone())).send(),
         };
 
         // include request information
-        response_map.insert("request_url".parse().unwrap(), config.url.parse().unwrap());
+        response_map.insert("request_url".parse().unwrap(), Value::from(config.url));
         response_map.insert("request_method".parse().unwrap(), Value::from(config.method.to_string()));
         response_map.insert("request_data".parse().unwrap(), Value::from(
-            config.body_json.into_iter().map(
+            config.body_json.clone().into_iter().map(
                 |x: (String, Value)| {
-                    serde_json::to_string(&[
-                        x.0.as_str(),
-                        " : ",
-                        x.1.as_str().unwrap()
-                    ]).unwrap()
+                    format!("{} : {}", x.0.as_str(),  x.1.as_str().unwrap())
                 }
             ).collect::<Vec<String>>()
         ));
         response_map.insert("request_headers".parse().unwrap(), Value::from(
             config.headers.into_iter().map(
-                |x: (String, String)| {
-                    serde_json::to_string(&[
-                        x.0.as_str(),
-                        " : ",
-                        x.1.as_str()
-                    ]).unwrap()
+                |x: (String, Value)| {
+                    format!("{} : {}", x.0.as_str(), x.1.as_str().unwrap())
                 }
             ).collect::<Vec<String>>()
         ));
 
         if resp.is_ok() {
             let response = resp.unwrap();
+
             // if status code is successful
             if response.status().is_success() {
                 // println!("success = {:?}", response);
-                response_map.insert("status".parse().unwrap(), "success".parse().unwrap());
+                response_map.insert(String::from("status"), Value::from("success"));
 
             } else {
                 // println!("error = {:?}", response);
-                response_map.insert("status".parse().unwrap(), "failure".parse().unwrap());
+                response_map.insert(String::from("status"), Value::from("failure"));
             }
-
-            // response_map.insert(
-            //     "data".parse().unwrap(),
-            //     Value::from(response.json::<String>().unwrap().to_string()),
-            // );
 
            response_map.insert(
                "code".parse().unwrap(),
@@ -246,22 +235,31 @@ pub fn generate_request<'a>(config: HttpProtocol) -> HashMap<String, Value> {
                 Value::from(
                         response.headers().into_iter().map(
                            |x: (&HeaderName, &HeaderValue)|  {
-                               serde_json::to_string(&[
-                                   x.0.as_str(),
-                                   " : ",
-                                   x.1.to_str().unwrap(),
-                               ]).unwrap()
+                               format!("{} : {}", x.0.as_str(), x.1.to_str().unwrap())
                            }
                         ).collect::<Vec<String>>()
                 ),
             );
+
+            // handle response data based on headers
+            if response.headers().get("content-type").unwrap() == "application/json" {
+                response_map.insert(
+                    "data".parse().unwrap(),
+                     Value::from(response.json::<Value>().unwrap()),
+                );
+            } else {
+                response_map.insert(
+                    "data".parse().unwrap(),
+                    Value::from(response.text().unwrap()),
+                );
+            }
         } else {
-            response_map.insert("status".parse().unwrap(), "failure".parse().unwrap());
+            response_map.insert("status".parse().unwrap(), Value::from("failure"));
             let response = resp.unwrap_err();
             // println!("status = {:?}", response);
             response_map.insert(
                 "data".parse().unwrap(),
-                response.to_string().parse().unwrap(),
+                Value::from(response.to_string()),
             );
         }
     }
@@ -271,8 +269,8 @@ pub fn generate_request<'a>(config: HttpProtocol) -> HashMap<String, Value> {
 
 // fn to parse received vector of hashmap into final result hashmap
 pub fn prepare_result<'a>(
-    result_info: Vec<HashMap<String, Value>>,
-) -> HashMap<String, Value> {
+    result_info: Vec<Map<String, Value>>,
+) -> Map<String, Value> {
     let mut success_count: f64 = 0.0;
     let mut failed_count: f64 = 0.0;
     let mut percentage_successful: f64 = 0.0;
@@ -286,26 +284,26 @@ pub fn prepare_result<'a>(
             failed_count += 1.0
         }
 
-        percentage_successful = (success_count / (success_count + failed_count)) * 100.0
+        percentage_successful = (success_count.clone() / (success_count.clone() + failed_count.clone())) * 100.0
     }
 
-    let mut results: HashMap<String, Value> = HashMap::new();
+    let mut results: Map<String, Value> = Map::new();
     results.insert("Successful Requests".parse().unwrap(), Value::from(success_count));
     results.insert("Failed Requests".parse().unwrap(), Value::from(failed_count));
     results.insert("Percentage Successful".parse().unwrap(), Value::from(percentage_successful.round()));
     results.insert("Total Requests".parse().unwrap(), Value::from(result_info.len() as f64));
-    results.insert("requests".parse().unwrap(),
+    results.insert("Requests".parse().unwrap(),
                    Value::from(result_info.into_iter().map(
-                       |x: HashMap<String, Value>| {
-                           serde_json::to_string(&x).unwrap() as String
+                       |x: Map<String, Value>| {
+                           Value::from(x)
                        }
-                   ).collect::<Vec<String>>())
+                   ).collect::<Vec<Value>>())
     );
     return results;
 }
 
 // fn to print final result hashmap
-pub fn print_result(results: HashMap<String, Value>) {
+pub fn print_result(results: Map<String, Value>) {
     write_to_terminal_multicolor("Results:").expect("unable to write to terminal");
     // print each entry of the result
     for (title, value) in &results {

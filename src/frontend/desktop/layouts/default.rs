@@ -1,7 +1,7 @@
-use gtk::prelude::*;
-use gtk::{HeaderBar,StackSidebar, Box, Widget, Orientation, WindowControls, PackType, Builder};
-use crate::frontend::desktop::components::navigation_bar::navigation_bar;
-use crate::frontend::desktop::components::sidebar::sidebar;
+
+use gtk::{Builder};
+
+
 
 pub fn default_layout() -> Builder {
     let builder = Builder::from_string(include_str!("default.ui"));

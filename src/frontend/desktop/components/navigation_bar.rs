@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use gtk::{Box,Orientation, PackType, WindowControls};
 
-pub fn navigation_bar() -> Box {
+pub fn _navigation_bar() -> Box {
     let template = Box::builder()
         .orientation(Orientation::Horizontal)
         .build();

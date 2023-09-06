@@ -1,5 +1,5 @@
 use std::fmt;
-use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 
 
@@ -54,7 +54,3 @@ impl fmt::Display for HttpMethods {
 //     SUCCESS,
 //     FAILURE,
 // }
-
-pub struct GlobalServerState {
-    pub app_name: String,
-}

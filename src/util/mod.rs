@@ -1,5 +1,5 @@
-use std::io::{self, Write};
-use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use std::io::{Write};
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 pub fn write_to_terminal_multicolor(text: &str) -> Result<(), Box<dyn std::error::Error>> {
     // let buffer_writer = BufferWriter::stderr(ColorChoice::Always);
@@ -13,10 +13,10 @@ pub fn write_to_terminal_multicolor(text: &str) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-macro_rules! hash {
-    ($($key:expr => $value:expr), *) => {
-        let mut hashmap = ::std::collections::HashMap::new();
-        $(hashmap.insert($key, $value);)*
-        hashmap
-    }
-}
+// macro_rules! hash {
+//     ($($key:expr => $value:expr), *) => {
+//         let mut hashmap = ::std::collections::HashMap::new();
+//         $(hashmap.insert($key, $value);)*
+//         hashmap
+//     }
+// }
