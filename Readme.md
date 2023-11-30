@@ -1,6 +1,6 @@
 # Reliability Tester
 
-- This is an application built in rust to help me test the reliability of my systems by set protocols
+- This is an application built in rust to help me test the reliability of systems by set protocols
 
 ## Plan
 

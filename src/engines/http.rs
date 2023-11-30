@@ -90,7 +90,7 @@ impl HttpEngine {
         write_to_terminal_multicolor("load test complete!").expect("unable to write to terminal");
         // print results
         print_result(results.clone());
-        return results;
+        results
     }
     pub fn stress_test(config: AppConfig<HttpProtocol>) -> Map<String, Value> {
         write_to_terminal_multicolor("stress test initiated!")
@@ -103,7 +103,7 @@ impl HttpEngine {
         write_to_terminal_multicolor("stress test complete!").expect("unable to write to terminal");
         // print results
         print_result(results.clone());
-        return results;
+        results
     }
 }
 
@@ -201,14 +201,14 @@ pub fn generate_request<'a>(config: HttpProtocol) -> Map<String, Value> {
         response_map.insert("request_data".parse().unwrap(), Value::from(
             config.body_json.clone().into_iter().map(
                 |x: (String, Value)| {
-                    format!("{} : {}", x.0.as_str(),  x.1.as_str().unwrap())
+                    format!("{} : {}", x.0.as_str(),  x.1.as_str().unwrap_or_default())
                 }
             ).collect::<Vec<String>>()
         ));
         response_map.insert("request_headers".parse().unwrap(), Value::from(
             config.headers.into_iter().map(
                 |x: (String, Value)| {
-                    format!("{} : {}", x.0.as_str(), x.1.as_str().unwrap())
+                    format!("{} : {}", x.0.as_str(), x.1.as_str().unwrap_or_default())
                 }
             ).collect::<Vec<String>>()
         ));
@@ -235,22 +235,22 @@ pub fn generate_request<'a>(config: HttpProtocol) -> Map<String, Value> {
                 Value::from(
                         response.headers().into_iter().map(
                            |x: (&HeaderName, &HeaderValue)|  {
-                               format!("{} : {}", x.0.as_str(), x.1.to_str().unwrap())
+                               format!("{} : {}", x.0.as_str(), x.1.to_str().unwrap_or_default())
                            }
                         ).collect::<Vec<String>>()
                 ),
             );
 
             // handle response data based on headers
-            if response.headers().get("content-type").unwrap() == "application/json" {
+            if response.headers().get("content-type").clone().is_some() && response.headers().get("content-type").unwrap() == "application/json" {
                 response_map.insert(
                     "data".parse().unwrap(),
-                     Value::from(response.json::<Value>().unwrap()),
+                     response.json::<Value>().unwrap_or_default(),
                 );
             } else {
                 response_map.insert(
                     "data".parse().unwrap(),
-                    Value::from(response.text().unwrap()),
+                    Value::from(response.text().unwrap_or_default()),
                 );
             }
         } else {
@@ -264,7 +264,7 @@ pub fn generate_request<'a>(config: HttpProtocol) -> Map<String, Value> {
         }
     }
 
-    return response_map;
+    response_map
 }
 
 // fn to parse received vector of hashmap into final result hashmap
@@ -299,7 +299,7 @@ pub fn prepare_result<'a>(
                        }
                    ).collect::<Vec<Value>>())
     );
-    return results;
+    results
 }
 
 // fn to print final result hashmap

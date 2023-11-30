@@ -8,6 +8,8 @@ use actix_web::web::Data;
 use serde_json::{Map, Value};
 use crate::engines::http::HttpEngine;
 use serde::{Deserialize};
+use actix_web::middleware::Logger;
+use env_logger::Env;
 
 
 
@@ -92,9 +94,12 @@ async fn execute(req: web::Json<ExecuteRequest>) -> impl Responder {
 pub async fn ignite_web_server() -> std::io::Result<()> {
 
     write_to_terminal_multicolor("Server Live @ Port 7373").expect("TODO: panic message");
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
     HttpServer::new(|| {
         App::new()
             .app_data(Data::new("Reliability Tester"))
+            .wrap(Logger::default())
+            .wrap(Logger::new("%a %{User-Agent}i"))
             .service(execute)
             .service(status)
     })
